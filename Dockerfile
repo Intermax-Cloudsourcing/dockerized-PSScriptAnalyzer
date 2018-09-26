@@ -28,5 +28,6 @@ RUN cd /tmp/PSScriptAnalyzer \
 ######################################################
 FROM base-powershell
 
-COPY --from=powershell-ubuntu /tmp/PSScriptAnalyzer/out/PSScriptAnalyzer /opt/microsoft/powershell/6-preview/Modules/
-ENTRYPOINT ["/opt/microsoft/powershell/6-preview/pwsh"]
+COPY --from=powershell-ubuntu /tmp/PSScriptAnalyzer/out/ /opt/microsoft/powershell/6-preview/Modules/
+USER user
+ENTRYPOINT ["/opt/microsoft/powershell/6-preview/pwsh", "-C", "Invoke-ScriptAnalyzer"]
