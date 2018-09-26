@@ -2,5 +2,5 @@
 
 ## Usage
 ```
-docker run -t -v ${PWD}:/data/ test /data/
+docker run -t -v ${PWD}:/data/ --tmpfs /tmp intermax/psscriptanalyzer -RecurseCustomRulePath /data/
 ```
