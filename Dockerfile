@@ -1,33 +1,28 @@
-######################################################
-# BUILDING PSScriptAnalyzer
-######################################################
-FROM mcr.microsoft.com/powershell:6.1.0-rc.1-ubuntu-18.04 as powershell-ubuntu
+FROM microsoft/dotnet:2.1.403-sdk-alpine3.7 as dotnet-alpine
+FROM mcr.microsoft.com/powershell:6.1.0-rc.1-alpine-3.8 as builder
 
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
- LC_ALL=en_US.UTF-8 \
- LANG=en_US.UTF-8
+ARG PSSCRIPTANALYZER_VERSION=1.17.1
 
-# Opt out from .NET Core tools telemetry
-ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+# Add dotnet to builder
+COPY --from=dotnet-alpine /usr/share/dotnet /usr/share/dotnet
+RUN ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-ARG PSScriptAnalyzer_VERSION=1.17.1
-ARG SDK_VERSION=2.1.202
-
-RUN apt-get update \
-    && apt-get install -y dotnet-sdk-${SDK_VERSION} libssl1.0.0
-
-ADD https://github.com/PowerShell/PSScriptAnalyzer/archive/${PSScriptAnalyzer_VERSION}.tar.gz /tmp/PSScriptAnalyzer.tar.gz
+ADD https://github.com/PowerShell/PSScriptAnalyzer/archive/${PSSCRIPTANALYZER_VERSION}.tar.gz /tmp/PSScriptAnalyzer.tar.gz
 RUN mkdir /tmp/PSScriptAnalyzer \
     && tar zxf /tmp/PSScriptAnalyzer.tar.gz --strip-components=1 -C /tmp/PSScriptAnalyzer
 
-RUN cd /tmp/PSScriptAnalyzer \
- && /opt/microsoft/powershell/6-preview/pwsh -c "./buildCoreClr.ps1 -Framework netstandard2.0 -Configuration Release -Build"
+# FIXME: Needed since there is no 2.1.101 SDK available for download which is specified in the global.json
+# Wait till https://github.com/PowerShell/PSScriptAnalyzer/pull/1086 is merged
+RUN echo "{}" > /tmp/PSScriptAnalyzer/global.json
+
+WORKDIR /tmp/PSScriptAnalyzer
+RUN /opt/microsoft/powershell/6-preview/pwsh -c "./buildCoreClr.ps1 -Framework netstandard2.0 -Configuration Release -Build"
 
 ######################################################
-# ADD to powershell base image
+# FINAL IMAGE
 ######################################################
 FROM base-powershell
 
-COPY --from=powershell-ubuntu /tmp/PSScriptAnalyzer/out/ /opt/microsoft/powershell/6-preview/Modules/
-USER user
+COPY --from=builder /tmp/PSScriptAnalyzer/out/ /opt/microsoft/powershell/6-preview/Modules/
+USER ${USER}
 ENTRYPOINT ["/opt/microsoft/powershell/6-preview/pwsh", "-C", "Invoke-ScriptAnalyzer"]
